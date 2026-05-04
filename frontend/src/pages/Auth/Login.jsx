@@ -1,54 +1,59 @@
-import React, { useState } from 'react'
+import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Input from '../../components/inputs/Input';
 import { validateEmail } from '../../utils/helper';
 import axiosInstance from '../../utils/axiosInstance';
 import { API_PATHS } from '../../utils/apiPaths';
-import { useContext } from 'react';
 import { UserContext } from '../../context/userContext';
 
-
-const Login = ({ setCurrentPage }) => {
+const Login = ({ setCurrentPage, setOpenAuthModal }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
 
-  const { updateUser} = useContext(UserContext)
+  const { updateUser } = useContext(UserContext);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    if(!validateEmail(email)){
+    if (!validateEmail(email)) {
       setError("Please enter a valid email address.");
       return;
     }
-    if(!password){
+
+    if (!password) {
       setError("Please enter your password.");
       return;
     }
+
     setError("");
-    // login API Call
-    try{
+
+    try {
       const response = await axiosInstance.post(API_PATHS.AUTH.LOGIN, {
         email,
         password,
       });
+
       const { token } = response.data;
 
       if (token) {
         localStorage.setItem("token", token);
-        updateUser(response.data)
-        navigate("/");
+        updateUser(response.data);
+
+        setOpenAuthModal(false);   // ✅ CLOSE MODAL
+        navigate("/");             // ✅ REDIRECT TO HOME
       }
-    } catch (error){
-      if(error.response && error.response.data.message){
+
+    } catch (error) {
+      if (error.response && error.response.data.message) {
         setError(error.response.data.message);
-      }else{
+      } else {
         setError("An error occurred during login. Please try again.");
       }
     }
   };
+
   return (
     <div className="w-[90vw] md:w-[33vw] p-7 flex flex-col justify-center">
       <h3 className="text-lg font-semibold text-black">Welcome Back</h3>
@@ -74,15 +79,17 @@ const Login = ({ setCurrentPage }) => {
         />
 
         {error && <p className="text-red-500 text-xs pb-2.5">{error}</p>}
+
         <button type="submit" className="btn-primary">
           LOGIN
         </button>
+
         <p className="text-[13px] text-slate-800 mt-3">
           Don't have an account?{" "}
-          <button className="font-medium text-red-500 text-primary underline cursor-pointer"
-          onClick={() => {
-            setCurrentPage("signUp");
-          }}
+          <button
+            type="button"
+            className="font-medium text-red-500 underline cursor-pointer"
+            onClick={() => setCurrentPage("signUp")}
           >
             SignUp
           </button>
