@@ -6,7 +6,6 @@ const {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-
 // ✅ Extract JSON safely from AI response
 const extractJSON = (text) => {
   const firstBrace = text.indexOf("{");
