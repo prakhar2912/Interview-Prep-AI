@@ -39,7 +39,7 @@ const Login = ({ setCurrentPage }) => {
       if (token) {
         localStorage.setItem("token", token);
         updateUser(response.data)
-        navigate("/dashboard");
+        navigate("/");
       }
     } catch (error){
       if(error.response && error.response.data.message){
