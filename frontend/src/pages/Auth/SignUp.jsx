@@ -8,20 +8,19 @@ import axiosInstance from '../../utils/axiosInstance';
 import { API_PATHS } from '../../utils/apiPaths';
 import uploadImage from '../../utils/uploadImage';
 
-const SignUp = ({ setCurrentPage }) => {
+const SignUp = ({ setCurrentPage, setOpenAuthModal }) => {
   const [profilePic, setProfilePic] = useState(null);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { updateUser } = useContext(UserContext); // ✅ FIXED
+  const { updateUser } = useContext(UserContext);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   const handleSignUp = async (e) => {
     e.preventDefault();
-    console.log("Submitting...");
 
-    let profileImageUrl = ""; // ✅ FIXED
+    let profileImageUrl = "";
 
     if (!fullName) {
       setError("Please enter your full name.");
@@ -41,7 +40,7 @@ const SignUp = ({ setCurrentPage }) => {
     setError("");
 
     try {
-      // Upload image if present
+      // Upload profile image (optional)
       if (profilePic) {
         const imgUploadRes = await uploadImage(profilePic);
         profileImageUrl = imgUploadRes.imageUrl || "";
@@ -59,7 +58,9 @@ const SignUp = ({ setCurrentPage }) => {
       if (token) {
         localStorage.setItem("token", token);
         updateUser(response.data);
-        navigate("/");
+
+        setOpenAuthModal(false);   // ✅ CLOSE MODAL
+        navigate("/");             // ✅ REDIRECT TO HOME
       }
 
     } catch (error) {
