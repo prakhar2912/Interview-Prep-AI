@@ -133,28 +133,28 @@ const LandingPage = () => {
       </div>
 
       {/* Modal */}
-        <Modal
-          isOpen={openAuthModal}
-          onClose={() => {
-            setOpenAuthModal(false);
-            setCurrentPage("login");
-          }}
-          hideHeader
-        >
-          {currentPage === "login" && (
-            <Login
-              setCurrentPage={setCurrentPage}
-              setOpenAuthModal={setOpenAuthModal}   // ✅ ADD THIS
-            />
-          )}
-        
-          {currentPage === "signUp" && (
-            <SignUp
-              setCurrentPage={setCurrentPage}
-              setOpenAuthModal={setOpenAuthModal}   // ✅ ADD THIS
-            />
-          )}
-        </Modal>
+      <Modal
+        isOpen={openAuthModal}
+        onClose={() => {
+          setOpenAuthModal(false);
+          setCurrentPage("login");
+        }}
+        hideHeader
+      >
+        {currentPage === "login" && (
+          <Login 
+            setCurrentPage={setCurrentPage} 
+            setOpenAuthModal={setOpenAuthModal} 
+          />
+        )}
+      
+        {currentPage === "signUp" && (
+          <SignUp 
+            setCurrentPage={setCurrentPage} 
+            setOpenAuthModal={setOpenAuthModal} 
+          />
+        )}
+      </Modal>
     </>
   );
 };
