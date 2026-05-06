@@ -7,12 +7,14 @@ import { UserContext } from '../../context/userContext';
 import axiosInstance from '../../utils/axiosInstance';
 import { API_PATHS } from '../../utils/apiPaths';
 import uploadImage from '../../utils/uploadImage';
+import SpinnerLoader from '../../components/Loader/SpinnerLoader';
 
 const SignUp = ({ setCurrentPage, setOpenAuthModal }) => {
   const [profilePic, setProfilePic] = useState(null);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false); // ✅ NEW
   const { updateUser } = useContext(UserContext);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
@@ -38,9 +40,9 @@ const SignUp = ({ setCurrentPage, setOpenAuthModal }) => {
     }
 
     setError("");
+    setLoading(true); // ✅ START LOADING
 
     try {
-      // Upload profile image (optional)
       if (profilePic) {
         const imgUploadRes = await uploadImage(profilePic);
         profileImageUrl = imgUploadRes.imageUrl || "";
@@ -59,16 +61,18 @@ const SignUp = ({ setCurrentPage, setOpenAuthModal }) => {
         localStorage.setItem("token", token);
         updateUser(response.data);
 
-        setOpenAuthModal(false);   // ✅ CLOSE MODAL
-        navigate("/");             // ✅ REDIRECT TO HOME
+        setOpenAuthModal(false);
+        navigate("/");
       }
 
     } catch (error) {
       if (error.response && error.response.data.message) {
         setError(error.response.data.message);
       } else {
-        setError("An error occurred during sign up. Please try again.");
+        setError("An error occurred during sign up.");
       }
+    } finally {
+      setLoading(false); // ✅ STOP LOADING
     }
   };
 
@@ -109,8 +113,12 @@ const SignUp = ({ setCurrentPage, setOpenAuthModal }) => {
 
           {error && <p className="text-red-500 text-xs pb-2.5">{error}</p>}
 
-          <button type="submit" className="btn-primary">
-            SIGN UP
+          <button
+            type="submit"
+            className="btn-primary flex justify-center items-center"
+            disabled={loading}
+          >
+            {loading ? <SpinnerLoader /> : "SIGN UP"}
           </button>
 
           <p className="text-[13px] text-slate-800 mt-3">
