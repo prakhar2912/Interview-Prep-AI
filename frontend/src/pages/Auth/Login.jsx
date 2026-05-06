@@ -5,11 +5,13 @@ import { validateEmail } from '../../utils/helper';
 import axiosInstance from '../../utils/axiosInstance';
 import { API_PATHS } from '../../utils/apiPaths';
 import { UserContext } from '../../context/userContext';
+import SpinnerLoader from '../../components/Loader/SpinnerLoader';
 
 const Login = ({ setCurrentPage, setOpenAuthModal }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false); // ✅ NEW
 
   const { updateUser } = useContext(UserContext);
   const navigate = useNavigate();
@@ -28,6 +30,7 @@ const Login = ({ setCurrentPage, setOpenAuthModal }) => {
     }
 
     setError("");
+    setLoading(true); // ✅ START LOADING
 
     try {
       const response = await axiosInstance.post(API_PATHS.AUTH.LOGIN, {
@@ -41,16 +44,18 @@ const Login = ({ setCurrentPage, setOpenAuthModal }) => {
         localStorage.setItem("token", token);
         updateUser(response.data);
 
-        setOpenAuthModal(false);   // ✅ CLOSE MODAL
-        navigate("/");             // ✅ REDIRECT TO HOME
+        setOpenAuthModal(false);
+        navigate("/");
       }
 
     } catch (error) {
       if (error.response && error.response.data.message) {
         setError(error.response.data.message);
       } else {
-        setError("An error occurred during login. Please try again.");
+        setError("An error occurred during login.");
       }
+    } finally {
+      setLoading(false); // ✅ STOP LOADING
     }
   };
 
@@ -80,8 +85,12 @@ const Login = ({ setCurrentPage, setOpenAuthModal }) => {
 
         {error && <p className="text-red-500 text-xs pb-2.5">{error}</p>}
 
-        <button type="submit" className="btn-primary">
-          LOGIN
+        <button
+          type="submit"
+          className="btn-primary flex justify-center items-center"
+          disabled={loading}
+        >
+          {loading ? <SpinnerLoader /> : "LOGIN"}
         </button>
 
         <p className="text-[13px] text-slate-800 mt-3">
