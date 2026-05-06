@@ -14,9 +14,10 @@ const SignUp = ({ setCurrentPage, setOpenAuthModal }) => {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false); // ✅ NEW
-  const { updateUser } = useContext(UserContext);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false); // ✅ loading
+
+  const { updateUser } = useContext(UserContext);
   const navigate = useNavigate();
 
   const handleSignUp = async (e) => {
@@ -40,7 +41,7 @@ const SignUp = ({ setCurrentPage, setOpenAuthModal }) => {
     }
 
     setError("");
-    setLoading(true); // ✅ START LOADING
+    setLoading(true); // ✅ start loading
 
     try {
       if (profilePic) {
@@ -61,18 +62,18 @@ const SignUp = ({ setCurrentPage, setOpenAuthModal }) => {
         localStorage.setItem("token", token);
         updateUser(response.data);
 
-        setOpenAuthModal(false);
-        navigate("/");
+        setOpenAuthModal(false); // ✅ close modal
+        navigate("/"); // ✅ go home
       }
 
     } catch (error) {
       if (error.response && error.response.data.message) {
         setError(error.response.data.message);
       } else {
-        setError("An error occurred during sign up.");
+        setError("An error occurred during sign up. Please try again.");
       }
     } finally {
-      setLoading(false); // ✅ STOP LOADING
+      setLoading(false); // ✅ stop loading
     }
   };
 
@@ -115,10 +116,18 @@ const SignUp = ({ setCurrentPage, setOpenAuthModal }) => {
 
           <button
             type="submit"
-            className="btn-primary flex justify-center items-center"
             disabled={loading}
+            className="btn-primary w-full flex justify-center items-center relative"
           >
-            {loading ? <SpinnerLoader /> : "SIGN UP"}
+            <span className={`${loading ? "invisible" : "visible"}`}>
+              SIGN UP
+            </span>
+
+            {loading && (
+              <div className="absolute">
+                <SpinnerLoader />
+              </div>
+            )}
           </button>
 
           <p className="text-[13px] text-slate-800 mt-3">
