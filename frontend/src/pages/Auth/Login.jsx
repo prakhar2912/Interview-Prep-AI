@@ -11,7 +11,7 @@ const Login = ({ setCurrentPage, setOpenAuthModal }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false); // ✅ NEW
+  const [loading, setLoading] = useState(false); // ✅ loading state
 
   const { updateUser } = useContext(UserContext);
   const navigate = useNavigate();
@@ -30,7 +30,7 @@ const Login = ({ setCurrentPage, setOpenAuthModal }) => {
     }
 
     setError("");
-    setLoading(true); // ✅ START LOADING
+    setLoading(true); // ✅ start loading
 
     try {
       const response = await axiosInstance.post(API_PATHS.AUTH.LOGIN, {
@@ -44,18 +44,18 @@ const Login = ({ setCurrentPage, setOpenAuthModal }) => {
         localStorage.setItem("token", token);
         updateUser(response.data);
 
-        setOpenAuthModal(false);
-        navigate("/");
+        setOpenAuthModal(false); // ✅ close modal
+        navigate("/"); // ✅ go to home
       }
 
     } catch (error) {
       if (error.response && error.response.data.message) {
         setError(error.response.data.message);
       } else {
-        setError("An error occurred during login.");
+        setError("An error occurred during login. Please try again.");
       }
     } finally {
-      setLoading(false); // ✅ STOP LOADING
+      setLoading(false); // ✅ stop loading
     }
   };
 
@@ -87,10 +87,18 @@ const Login = ({ setCurrentPage, setOpenAuthModal }) => {
 
         <button
           type="submit"
-          className="btn-primary flex justify-center items-center"
           disabled={loading}
+          className="btn-primary w-full flex justify-center items-center relative"
         >
-          {loading ? <SpinnerLoader /> : "LOGIN"}
+          <span className={`${loading ? "invisible" : "visible"}`}>
+            LOGIN
+          </span>
+
+          {loading && (
+            <div className="absolute">
+              <SpinnerLoader />
+            </div>
+          )}
         </button>
 
         <p className="text-[13px] text-slate-800 mt-3">
