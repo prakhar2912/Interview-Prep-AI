@@ -60,7 +60,7 @@ const generateInterviewQuestions = async (req, res) => {
     );
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash-lite",
     });
 
     const rawText = await generateWithRetry(model, prompt);
@@ -133,7 +133,7 @@ const generateConceptExplanation = async (req, res) => {
     const prompt = conceptExplainPrompt(question);
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash-lite",
     });
 
     const rawText = await generateWithRetry(model, prompt);
