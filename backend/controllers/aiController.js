@@ -1,5 +1,6 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 
+
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const {
   conceptExplainPrompt,
   questionAnswerPrompt,
@@ -7,101 +8,48 @@ const {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// ==========================
-// SAFE JSON EXTRACTOR
-// ==========================
-const extractJSONArray = (text) => {
-  try {
-    const start = text.indexOf("[");
-    const end = text.lastIndexOf("]");
+// ✅ Extract JSON safely from AI response
+const extractJSON = (text) => {
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
 
-    if (start === -1 || end === -1) {
-      return null;
-    }
+  if (firstBrace === -1 || lastBrace === -1) return null;
 
-    return text.substring(start, end + 1);
-  } catch {
-    return null;
-  }
+  return text.substring(firstBrace, lastBrace + 1);
 };
 
-const extractJSONObject = (text) => {
-  try {
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
 
-    if (start === -1 || end === -1) {
-      return null;
-    }
-
-    return text.substring(start, end + 1);
-  } catch {
-    return null;
-  }
-};
-
-// ==========================
-// RETRY FUNCTION
-// ==========================
-const generateWithRetry = async (
-  model,
-  prompt,
-  retries = 3
-) => {
+// ✅ Retry wrapper (handles 429 & 503)
+const generateWithRetry = async (model, prompt, retries = 3) => {
   try {
     const result = await model.generateContent(prompt);
-
     const response = await result.response;
-
     return response.text();
   } catch (error) {
-    console.log("Gemini Error:", error.message);
+    console.error("⚠️ Gemini Error:", error.status, error.message);
 
-    if (
-      (error.status === 429 || error.status === 503) &&
-      retries > 0
-    ) {
-      console.log("Retrying AI request...");
-
-      await new Promise((resolve) =>
-        setTimeout(resolve, 3000)
-      );
-
-      return generateWithRetry(
-        model,
-        prompt,
-        retries - 1
-      );
+    // Retry only for rate limit / overload
+    if ((error.status === 429 || error.status === 503) && retries > 0) {
+      console.log(`🔁 Retrying... (${3 - retries + 1})`);
+      await new Promise((res) => setTimeout(res, 2000)); // wait 2s
+      return generateWithRetry(model, prompt, retries - 1);
     }
 
     throw error;
   }
 };
 
-// =================================================
-// GENERATE QUESTIONS
-// =================================================
-const generateInterviewQuestions = async (
-  req,
-  res
-) => {
-  try {
-    const {
-      role,
-      experience,
-      topicsToFocus,
-      numberOfQuestions,
-    } = req.body;
 
-    if (
-      !role ||
-      !experience ||
-      !topicsToFocus ||
-      !numberOfQuestions
-    ) {
-      return res.status(400).json({
-        message: "Missing required fields",
-      });
+// =======================================================
+// @desc  Generate Interview Questions
+// @route POST /api/ai/generate-questions
+// =======================================================
+const generateInterviewQuestions = async (req, res) => {
+  try {
+    const { role, experience, topicsToFocus, numberOfQuestions } = req.body;
+
+    if (!role || !experience || !topicsToFocus || !numberOfQuestions) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
 
     const prompt = questionAnswerPrompt(
@@ -115,58 +63,71 @@ const generateInterviewQuestions = async (
       model: "gemini-1.5-flash",
     });
 
-    const rawText = await generateWithRetry(
-      model,
-      prompt
-    );
+    const rawText = await generateWithRetry(model, prompt);
 
-    console.log("RAW AI RESPONSE:", rawText);
+    // ✅ Handle array JSON
+    let jsonText;
 
-    const jsonText = extractJSONArray(rawText);
+    if (rawText.includes("[")) {
+      const first = rawText.indexOf("[");
+      const last = rawText.lastIndexOf("]");
+      jsonText = rawText.substring(first, last + 1);
+    } else {
+      jsonText = extractJSON(rawText);
+    }
 
     if (!jsonText) {
       return res.status(500).json({
-        message: "AI returned invalid format",
+        message: "No valid JSON found",
+        raw: rawText,
       });
     }
 
     let data;
-
     try {
       data = JSON.parse(jsonText);
     } catch (err) {
-      console.log("JSON Parse Error:", err);
-
       return res.status(500).json({
         message: "Invalid JSON from AI",
+        raw: rawText,
       });
     }
 
-    return res.status(200).json(data);
-  } catch (error) {
-    console.log("FINAL ERROR:", error);
+    res.status(200).json(data);
 
-    return res.status(500).json({
+  } catch (error) {
+    console.error("🔥 FINAL ERROR:", error);
+
+    if (error.status === 429) {
+      return res.status(429).json({
+        message: "Daily AI limit reached. Try again later.",
+      });
+    }
+
+    if (error.status === 503) {
+      return res.status(503).json({
+        message: "AI is busy. Please try again in a few seconds.",
+      });
+    }
+
+    res.status(500).json({
       message: "Failed to generate questions",
       error: error.message,
     });
   }
 };
 
-// =================================================
-// GENERATE EXPLANATION
-// =================================================
-const generateConceptExplanation = async (
-  req,
-  res
-) => {
+
+// =======================================================
+// @desc  Generate Concept Explanation
+// @route POST /api/ai/generate-explanation
+// =======================================================
+const generateConceptExplanation = async (req, res) => {
   try {
     const { question } = req.body;
 
     if (!question) {
-      return res.status(400).json({
-        message: "Question is required",
-      });
+      return res.status(400).json({ message: "Missing Required Fields" });
     }
 
     const prompt = conceptExplainPrompt(question);
@@ -175,235 +136,56 @@ const generateConceptExplanation = async (
       model: "gemini-1.5-flash",
     });
 
-    const rawText = await generateWithRetry(
-      model,
-      prompt
-    );
+    const rawText = await generateWithRetry(model, prompt);
 
-    console.log("RAW EXPLANATION:", rawText);
-
-    const jsonText = extractJSONObject(rawText);
+    const jsonText = extractJSON(rawText);
 
     if (!jsonText) {
       return res.status(500).json({
-        message: "AI returned invalid explanation",
+        message: "No valid JSON found",
+        raw: rawText,
       });
     }
 
     let data;
-
     try {
       data = JSON.parse(jsonText);
     } catch (err) {
-      console.log("JSON Parse Error:", err);
-
       return res.status(500).json({
         message: "Invalid JSON from AI",
+        raw: rawText,
       });
     }
 
-    return res.status(200).json(data);
-  } catch (error) {
-    console.log("FINAL ERROR:", error);
+    res.status(200).json(data);
 
-    return res.status(500).json({
+  } catch (error) {
+    console.error("🔥 FINAL ERROR:", error);
+
+    if (error.status === 429) {
+      return res.status(429).json({
+        message: "Daily AI limit reached. Try again later.",
+      });
+    }
+
+    if (error.status === 503) {
+      return res.status(503).json({
+        message: "AI is busy. Please try again shortly.",
+      });
+    }
+
+    res.status(500).json({
       message: "Failed to generate explanation",
       error: error.message,
     });
   }
 };
 
+
 module.exports = {
   generateInterviewQuestions,
   generateConceptExplanation,
 };
-
-// const { GoogleGenerativeAI } = require("@google/generative-ai");
-// const {
-//   conceptExplainPrompt,
-//   questionAnswerPrompt,
-// } = require("../utils/prompts");
-
-// const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// // ✅ Extract JSON safely from AI response
-// const extractJSON = (text) => {
-//   const firstBrace = text.indexOf("{");
-//   const lastBrace = text.lastIndexOf("}");
-
-//   if (firstBrace === -1 || lastBrace === -1) return null;
-
-//   return text.substring(firstBrace, lastBrace + 1);
-// };
-
-
-// // ✅ Retry wrapper (handles 429 & 503)
-// const generateWithRetry = async (model, prompt, retries = 3) => {
-//   try {
-//     const result = await model.generateContent(prompt);
-//     const response = await result.response;
-//     return response.text();
-//   } catch (error) {
-//     console.error("⚠️ Gemini Error:", error.status, error.message);
-
-//     // Retry only for rate limit / overload
-//     if ((error.status === 429 || error.status === 503) && retries > 0) {
-//       console.log(`🔁 Retrying... (${3 - retries + 1})`);
-//       await new Promise((res) => setTimeout(res, 2000)); // wait 2s
-//       return generateWithRetry(model, prompt, retries - 1);
-//     }
-
-//     throw error;
-//   }
-// };
-
-
-// // =======================================================
-// // @desc  Generate Interview Questions
-// // @route POST /api/ai/generate-questions
-// // =======================================================
-// const generateInterviewQuestions = async (req, res) => {
-//   try {
-//     const { role, experience, topicsToFocus, numberOfQuestions } = req.body;
-
-//     if (!role || !experience || !topicsToFocus || !numberOfQuestions) {
-//       return res.status(400).json({ message: "Missing required fields" });
-//     }
-
-//     const prompt = questionAnswerPrompt(
-//       role,
-//       experience,
-//       topicsToFocus,
-//       numberOfQuestions
-//     );
-
-//     const model = genAI.getGenerativeModel({
-//       model: "gemini-1.5-flash",
-//     });
-
-//     const rawText = await generateWithRetry(model, prompt);
-
-//     // ✅ Handle array JSON
-//     let jsonText;
-
-//     if (rawText.includes("[")) {
-//       const first = rawText.indexOf("[");
-//       const last = rawText.lastIndexOf("]");
-//       jsonText = rawText.substring(first, last + 1);
-//     } else {
-//       jsonText = extractJSON(rawText);
-//     }
-
-//     if (!jsonText) {
-//       return res.status(500).json({
-//         message: "No valid JSON found",
-//         raw: rawText,
-//       });
-//     }
-
-//     let data;
-//     try {
-//       data = JSON.parse(jsonText);
-//     } catch (err) {
-//       return res.status(500).json({
-//         message: "Invalid JSON from AI",
-//         raw: rawText,
-//       });
-//     }
-
-//     res.status(200).json(data);
-
-//   } catch (error) {
-//     console.error("🔥 FINAL ERROR:", error);
-
-//     if (error.status === 429) {
-//       return res.status(429).json({
-//         message: "Daily AI limit reached. Try again later.",
-//       });
-//     }
-
-//     if (error.status === 503) {
-//       return res.status(503).json({
-//         message: "AI is busy. Please try again in a few seconds.",
-//       });
-//     }
-
-//     res.status(500).json({
-//       message: "Failed to generate questions",
-//       error: error.message,
-//     });
-//   }
-// };
-
-
-// // =======================================================
-// // @desc  Generate Concept Explanation
-// // @route POST /api/ai/generate-explanation
-// // =======================================================
-// const generateConceptExplanation = async (req, res) => {
-//   try {
-//     const { question } = req.body;
-
-//     if (!question) {
-//       return res.status(400).json({ message: "Missing Required Fields" });
-//     }
-
-//     const prompt = conceptExplainPrompt(question);
-
-//     const model = genAI.getGenerativeModel({
-//       model: "gemini-1.5-flash",
-//     });
-
-//     const rawText = await generateWithRetry(model, prompt);
-
-//     const jsonText = extractJSON(rawText);
-
-//     if (!jsonText) {
-//       return res.status(500).json({
-//         message: "No valid JSON found",
-//         raw: rawText,
-//       });
-//     }
-
-//     let data;
-//     try {
-//       data = JSON.parse(jsonText);
-//     } catch (err) {
-//       return res.status(500).json({
-//         message: "Invalid JSON from AI",
-//         raw: rawText,
-//       });
-//     }
-
-//     res.status(200).json(data);
-
-//   } catch (error) {
-//     console.error("🔥 FINAL ERROR:", error);
-
-//     if (error.status === 429) {
-//       return res.status(429).json({
-//         message: "Daily AI limit reached. Try again later.",
-//       });
-//     }
-
-//     if (error.status === 503) {
-//       return res.status(503).json({
-//         message: "AI is busy. Please try again shortly.",
-//       });
-//     }
-
-//     res.status(500).json({
-//       message: "Failed to generate explanation",
-//       error: error.message,
-//     });
-//   }
-// };
-
-
-// module.exports = {
-//   generateInterviewQuestions,
-//   generateConceptExplanation,
-// };
 
 // // // const { GoogleGenAI } = require("@google/genai");
 // // const { GoogleGenerativeAI } = require("@google/generative-ai");      //extra
